@@ -16,6 +16,8 @@ function App() {
   });
   const [result, setResult] = useState(null);
   const [confidence, setConfidence] = useState(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -27,18 +29,38 @@ function App() {
     setLoading(true);
     setResult(null);
     setConfidence(null);
+    setMessage('');
+    setError('');
+    
     try {
-  const response = await fetch('http://localhost:5001/predict', {
+      // Convert numeric fields to numbers
+      const formData = {
+        ...form,
+        age: parseFloat(form.age),
+        hypertension: parseInt(form.hypertension),
+        heart_disease: parseInt(form.heart_disease),
+        avg_glucose_level: parseFloat(form.avg_glucose_level),
+        bmi: parseFloat(form.bmi)
+      };
+
+      const response = await fetch('http://localhost:5001/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(formData)
       });
+      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get prediction');
+      }
+      
       setResult(data.stroke_prediction);
       setConfidence(data.confidence);
+      setMessage(data.message || '');
     } catch (error) {
-      setResult('Error: Could not get prediction');
-      setConfidence(null);
+      console.error('Prediction error:', error);
+      setError(error.message || 'Could not get prediction. Please check if the backend server is running.');
     }
     setLoading(false);
   };
@@ -125,11 +147,19 @@ function App() {
           {loading ? 'Predicting...' : 'Predict'}
         </button>
       </form>
-      {result !== null && (
+      {error && (
+        <div className="error">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+      {result !== null && !error && (
         <div className="result">
-          <strong>Prediction:</strong> {result === 1 ? 'Stroke Risk' : result === 0 ? 'No Stroke Risk' : result}
+          <strong>Prediction:</strong> {result === 1 ? 'High Stroke Risk' : 'Low Stroke Risk'}
           {confidence !== null && (
-            <div><strong>Confidence:</strong> {confidence}</div>
+            <div><strong>Confidence:</strong> {(confidence * 100).toFixed(1)}%</div>
+          )}
+          {message && (
+            <div><strong>Assessment:</strong> {message}</div>
           )}
         </div>
       )}
